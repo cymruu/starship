@@ -6,7 +6,7 @@ use super::utils::path::PathExt as SPathExt;
 use indexmap::IndexMap;
 use path_slash::PathExt;
 use std::iter::FromIterator;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::{Context, Module};
@@ -44,66 +44,72 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     } else {
         &context.current_dir
     };
-
     log::debug!("Home dir: {:?}", &home_dir);
     log::debug!("Physical dir: {:?}", &physical_dir);
     log::debug!("Display dir: {:?}", &display_dir);
+    let mut display_dir = StarshipPath::from(display_dir);
 
-    // Attempt repository path contraction (if we are in a git repository)
-    let repo = if config.truncate_to_repo {
-        context.get_repo().ok()
-    } else {
-        None
-    };
-    let dir_string = repo
-        .and_then(|r| r.root.as_ref())
-        .filter(|root| *root != &home_dir)
-        .and_then(|root| contract_repo_path(display_dir, root));
+    let repo_path = context.get_repo().ok().and_then(|r| r.root.as_ref());
 
-    // Otherwise use the logical path, automatically contracting
-    // the home directory if required.
-    let dir_string =
-        dir_string.unwrap_or_else(|| contract_path(display_dir, &home_dir, &home_symbol));
+    if let Some(unwrapped_path) = repo_path {
+        display_dir.find_repo(unwrapped_path);
+    }
+    if config.truncate_to_repo {
+        display_dir.truncate_to_repo();
+    }
+    display_dir.contract_path(&home_dir);
 
-    #[cfg(windows)]
-    let dir_string = remove_extended_path_prefix(dir_string);
+    // let dir_string = repo
+    //     .and_then(|r| r.root.as_ref())
+    //     .filter(|root| *root != &home_dir)
+    //     .and_then(|root| contract_repo_path(display_dir, root));
 
-    // Apply path substitutions
-    let dir_string = substitute_path(dir_string, &config.substitutions);
+    // // Otherwise use the logical path, automatically contracting
+    // // the home directory if required.
+    // let dir_string =
+    //     dir_string.unwrap_or_else(|| contract_path(display_dir, &home_dir, &home_symbol));
 
-    // Truncate the dir string to the maximum number of path components
-    let dir_string = truncate(dir_string, config.truncation_length as usize);
+    // // Apply path substitutions
+    // let dir_string = substitute_path(dir_string, &config.substitutions);
 
-    let prefix = if is_truncated(&dir_string, &home_symbol) {
-        // Substitutions could have changed the prefix, so don't allow them and
-        // fish-style path contraction together
-        if config.fish_style_pwd_dir_length > 0 && config.substitutions.is_empty() {
-            // If user is using fish style path, we need to add the segment first
-            let contracted_home_dir = contract_path(display_dir, &home_dir, &home_symbol);
-            to_fish_style(
-                config.fish_style_pwd_dir_length as usize,
-                contracted_home_dir,
-                &dir_string,
-            )
-        } else {
-            String::from(config.truncation_symbol)
-        }
-    } else {
-        String::from("")
-    };
+    // // Truncate the dir string to the maximum number of path components
+    // let dir_string = truncate(dir_string, config.truncation_length as usize);
 
-    let displayed_path = prefix + &dir_string;
+    // let prefix = if is_truncated(&dir_string, &home_symbol) {
+    //     // Substitutions could have changed the prefix, so don't allow them and
+    //     // fish-style path contraction together
+    //     if config.fish_style_pwd_dir_length > 0 && config.substitutions.is_empty() {
+    //         // If user is using fish style path, we need to add the segment first
+    //         let contracted_home_dir = contract_path(display_dir, &home_dir, &home_symbol);
+    //         to_fish_style(
+    //             config.fish_style_pwd_dir_length as usize,
+    //             contracted_home_dir,
+    //             &dir_string,
+    //         )
+    //     } else {
+    //         String::from(config.truncation_symbol)
+    //     }
+    // } else {
+    //     String::from("")
+    // };
+
+    let path_meta = display_dir.get_format_string(&config);
+
     let lock_symbol = String::from(config.read_only);
 
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
+            .map_meta(|var, _| match var {
+                "path" => Some(&path_meta),
+                _ => None,
+            })
             .map_style(|variable| match variable {
                 "style" => Some(Ok(config.style)),
+                "repo_style" => Some(Ok(config.repo_style)),
                 "read_only_style" => Some(Ok(config.read_only_style)),
                 _ => None,
             })
             .map(|variable| match variable {
-                "path" => Some(Ok(&displayed_path)),
                 "read_only" => {
                     if is_readonly_dir(physical_dir) {
                         Some(Ok(&lock_symbol))
@@ -125,6 +131,90 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     });
 
     Some(module)
+}
+
+struct StarshipComponent<'a> {
+    component: Component<'a>,
+    is_repo: bool,
+    is_visible: bool,
+}
+
+impl StarshipComponent<'_> {
+    pub fn get_string(&self, config: &DirectoryConfig) -> String {
+        match self.is_visible {
+            true => match self.is_repo {
+                true => format!(
+                    "[{}]({})/",
+                    self.component.as_os_str().to_string_lossy(),
+                    config.repo_style
+                ),
+                false => format!("{}/", self.component.as_os_str().to_string_lossy()),
+            },
+            false => "".to_string(),
+        }
+    }
+}
+
+struct StarshipPath<'a> {
+    path: &'a PathBuf,
+    components: Vec<StarshipComponent<'a>>,
+}
+
+impl StarshipPath<'_> {
+    pub fn to_string_lossy(&self) -> std::borrow::Cow<'_, str> {
+        self.path.to_string_lossy()
+    }
+    pub fn find_repo(&mut self, repo_path: &Path) -> &Self {
+        let top_level_real_path = real_path(repo_path);
+        // Walk ancestors to preserve logical path in `full_path`.
+        // If we'd just `full_real_path.strip_prefix(top_level_real_path)`,
+        // then it wouldn't preserve logical path. It would've returned physical path.
+        for (i, ancestor) in self.path.ancestors().enumerate() {
+            let ancestor_real_path = real_path(ancestor);
+            if ancestor_real_path != top_level_real_path {
+                continue;
+            }
+            let components: Vec<_> = self.path.components().collect();
+            let repo_index = components.len() - i - 1;
+
+            self.components[repo_index].is_repo = true;
+        }
+        self
+    }
+    pub fn truncate_to_repo(&mut self) {
+        self.components
+            .iter_mut()
+            .take_while(|x| !x.is_repo)
+            .for_each(|x| x.is_visible = false)
+    }
+    pub fn contract_path(&mut self, top_level_path: &Path) {
+        if !self.path.normalised_starts_with(top_level_path) {
+            return;
+        }
+        let mut to_hide = top_level_path.components();
+        self.components
+            .iter_mut()
+            .filter(|x| to_hide.any(|x2| x2 == x.component))
+            .for_each(|x| x.is_visible = false);
+    }
+    pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
+        let path_meta = self.components.iter().map(|x| x.get_string(config));
+        String::from_iter(path_meta)
+    }
+}
+
+impl<'a> From<&'a PathBuf> for StarshipPath<'a> {
+    fn from(path: &'a PathBuf) -> StarshipPath<'a> {
+        let components: Vec<_> = path
+            .components()
+            .map(|x| StarshipComponent {
+                component: x,
+                is_repo: false,
+                is_visible: true,
+            })
+            .collect();
+        StarshipPath { path, components }
+    }
 }
 
 #[cfg(windows)]
