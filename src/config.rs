@@ -1,3 +1,4 @@
+use crate::conditional_style::StarshipConditionalStyle;
 use crate::configs::StarshipRootConfig;
 use crate::utils;
 use ansi_term::{Color, Style};
@@ -60,6 +61,20 @@ where
 impl<'a> ModuleConfig<'a> for &'a str {
     fn from_config(config: &'a Value) -> Option<Self> {
         config.as_str()
+    }
+}
+
+impl<'a> ModuleConfig<'a> for StarshipConditionalStyle<'a> {
+    fn from_config(config: &'a Value) -> Option<Self> {
+        match config {
+            Value::String(value) => Some(StarshipConditionalStyle {
+                env: "",
+                equals: "",
+                value,
+            }),
+            Value::Table(value) => Some(StarshipConditionalStyle::from(value)),
+            _ => None,
+        }
     }
 }
 
@@ -678,6 +693,32 @@ mod tests {
     fn test_from_option() {
         let config: Value = Value::String(String::from("S"));
         assert_eq!(<Option<&str>>::from_config(&config).unwrap(), Some("S"));
+    }
+
+    #[test]
+    fn test_from_conditional_style_from_string() {
+        let config: Value = Value::String(String::from("S"));
+        assert_eq!(
+            <StarshipConditionalStyle>::from_config(&config).unwrap(),
+            StarshipConditionalStyle::from("S")
+        );
+    }
+
+    #[test]
+    fn test_from_conditional_style_from_table() {
+        let config = toml::toml! {
+            env = "HOSTNAME"
+            equals = "home"
+            value = "bold dimmed red"
+        };
+        assert_eq!(
+            <StarshipConditionalStyle>::from_config(&config).unwrap(),
+            StarshipConditionalStyle {
+                env: "HOSTNAME",
+                equals: "home",
+                value: "bold dimmed red"
+            }
+        );
     }
 
     #[test]
