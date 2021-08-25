@@ -68,8 +68,8 @@ impl<'a> ModuleConfig<'a> for StarshipConditionalStyle<'a> {
     fn from_config(config: &'a Value) -> Option<Self> {
         match config {
             Value::String(value) => Some(StarshipConditionalStyle {
-                env: "",
-                equals: "",
+                env: None,
+                equals: None,
                 value,
             }),
             Value::Table(value) => Some(StarshipConditionalStyle::from(value)),
@@ -714,8 +714,8 @@ mod tests {
         assert_eq!(
             <StarshipConditionalStyle>::from_config(&config).unwrap(),
             StarshipConditionalStyle {
-                env: "HOSTNAME",
-                equals: "home",
+                env: Some("HOSTNAME"),
+                equals: Some("home"),
                 value: "bold dimmed red"
             }
         );
