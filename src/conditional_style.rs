@@ -1,3 +1,4 @@
+use crate::context::Context;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -37,4 +38,9 @@ impl<'a> From<&'a toml::value::Table> for StarshipConditionalStyle<'a> {
             value: get_value("value"),
         }
     }
+}
+
+pub fn get_style<'a>(context: &Context, items: &Vec<StarshipConditionalStyle<'a>>) -> &'a str {
+    items.iter().for_each(|s| log::warn!("{:?}", s));
+    "red"
 }

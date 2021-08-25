@@ -12,6 +12,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use super::{Context, Module};
 
 use super::utils::directory::truncate;
+use crate::conditional_style::get_style;
 use crate::config::RootModuleConfig;
 use crate::configs::directory::DirectoryConfig;
 use crate::formatter::StringFormatter;
@@ -98,7 +99,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
             .map_style(|variable| match variable {
-                "style" => Some(Ok(config.style)),
+                "style" => Some(Ok(get_style(context, &config.style))),
                 "read_only_style" => Some(Ok(config.read_only_style)),
                 _ => None,
             })
