@@ -719,6 +719,18 @@ mod tests {
                 value: "bold dimmed red"
             }
         );
+        let config2 = toml::toml! {
+            env = "HOSTNAME"
+            value = "bold dimmed red"
+        };
+        assert_eq!(
+            <StarshipConditionalStyle>::from_config(&config2).unwrap(),
+            StarshipConditionalStyle {
+                env: Some("HOSTNAME"),
+                equals: None,
+                value: "bold dimmed red"
+            }
+        );
     }
 
     #[test]
