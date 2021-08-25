@@ -8,6 +8,18 @@ pub struct StarshipConditionalStyle<'a> {
     pub value: &'a str,
 }
 
+impl<'a> StarshipConditionalStyle<'a> {
+    fn should_display(&self, context: &Context) -> bool {
+        match self.env {
+            Some(env_variable) => {
+                let env_variable_value = context.get_env(env_variable);
+                env_variable_value.as_deref() == self.equals
+            }
+            None => false,
+        }
+    }
+}
+
 impl<'a> Default for StarshipConditionalStyle<'a> {
     fn default() -> Self {
         StarshipConditionalStyle {
@@ -44,6 +56,14 @@ impl<'a> From<&'a toml::value::Table> for StarshipConditionalStyle<'a> {
 }
 
 pub fn get_style<'a>(context: &Context, items: &Vec<StarshipConditionalStyle<'a>>) -> &'a str {
-    items.iter().for_each(|s| log::warn!("{:?}", s));
-    "red"
+    let found = items.iter().find(|s| {
+        log::warn!("{:?} {}", s, s.should_display(context));
+        s.should_display(context)
+    });
+
+    if let Some(v) = found {
+        v.value
+    } else {
+        ""
+    }
 }
