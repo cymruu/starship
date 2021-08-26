@@ -99,7 +99,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
             .map_style(|variable| match variable {
-                "style" => Some(Ok(get_style(context, &config.style))),
+                "style" => Some(Ok(get_style(context, &config.style.0))),
                 "read_only_style" => Some(Ok(config.read_only_style)),
                 _ => None,
             })
