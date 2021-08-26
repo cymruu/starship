@@ -58,20 +58,15 @@ impl<'a> From<&'a toml::value::Table> for StarshipConditionalStyle<'a> {
     }
 }
 
-pub fn get_style<'a>(context: &Context, items: &Vec<StarshipConditionalStyle<'a>>) -> &'a str {
-    let found = items.iter().find(|s| {
-        log::warn!("{:?} {}", s, s.should_display(context));
-        s.should_display(context)
-    });
+pub fn get_style<'a>(context: &Context, items: &[StarshipConditionalStyle<'a>]) -> &'a str {
+    let found = items.iter().find(|s| s.should_display(context));
 
     if let Some(v) = found {
         v.value
+    } else if let Some(last) = items.iter().last() {
+        last.value
     } else {
-        if let Some(last) = items.iter().last() {
-            last.value
-        } else {
-            ""
-        }
+        ""
     }
 }
 
@@ -100,7 +95,7 @@ mod tests {
         let mut context = create_context();
         context.env.insert("env", "value".into());
 
-        assert_eq!(style.should_display(&context), true);
+        assert!(style.should_display(&context));
     }
     #[test]
     fn should_display_if_env_is_set_and_equals_is_none() {
@@ -112,7 +107,7 @@ mod tests {
         let mut context = create_context();
         context.env.insert("env", "value".into());
 
-        assert_eq!(style.should_display(&context), true);
+        assert!(style.should_display(&context));
     }
     #[test]
     fn should_not_display_if_not_equal() {
@@ -124,6 +119,6 @@ mod tests {
         let mut context = create_context();
         context.env.insert("env", "value".into());
 
-        assert_eq!(style.should_display(&context), false);
+        assert!(!style.should_display(&context));
     }
 }
