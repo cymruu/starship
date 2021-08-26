@@ -11,10 +11,13 @@ pub struct StarshipConditionalStyle<'a> {
 impl<'a> StarshipConditionalStyle<'a> {
     fn should_display(&self, context: &Context) -> bool {
         match self.env {
-            Some(env_variable) => {
-                let env_variable_value = context.get_env(env_variable);
-                env_variable_value.as_deref() == self.equals
-            }
+            Some(env_variable) => match self.equals {
+                Some(_) => {
+                    let env_variable_value = context.get_env(env_variable);
+                    env_variable_value.as_deref() == self.equals
+                }
+                None => true,
+            },
             None => false,
         }
     }
@@ -65,5 +68,58 @@ pub fn get_style<'a>(context: &Context, items: &Vec<StarshipConditionalStyle<'a>
         v.value
     } else {
         ""
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::conditional_style::StarshipConditionalStyle;
+    use crate::context::{Context, Shell};
+    use std::path::PathBuf;
+
+    fn create_context<'a>() -> Context<'a> {
+        Context::new_with_shell_and_path(
+            clap::ArgMatches::default(),
+            Shell::Unknown,
+            PathBuf::new(),
+            PathBuf::new(),
+        )
+    }
+
+    #[test]
+    fn should_display_env_set_matching() {
+        let style = StarshipConditionalStyle {
+            env: Some("env"),
+            equals: Some("value"),
+            value: "",
+        };
+        let mut context = create_context();
+        context.env.insert("env", "value".into());
+
+        assert_eq!(style.should_display(&context), true);
+    }
+    #[test]
+    fn should_display_if_env_is_set_and_equals_is_none() {
+        let style = StarshipConditionalStyle {
+            env: Some("env"),
+            equals: None,
+            value: "",
+        };
+        let mut context = create_context();
+        context.env.insert("env", "value".into());
+
+        assert_eq!(style.should_display(&context), true);
+    }
+    #[test]
+    fn should_not_display_if_not_equal() {
+        let style = StarshipConditionalStyle {
+            env: Some("env"),
+            equals: Some("different"),
+            value: "",
+        };
+        let mut context = create_context();
+        context.env.insert("env", "value".into());
+
+        assert_eq!(style.should_display(&context), false);
     }
 }
