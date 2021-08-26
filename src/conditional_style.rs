@@ -67,7 +67,11 @@ pub fn get_style<'a>(context: &Context, items: &Vec<StarshipConditionalStyle<'a>
     if let Some(v) = found {
         v.value
     } else {
-        ""
+        if let Some(last) = items.iter().last() {
+            last.value
+        } else {
+            ""
+        }
     }
 }
 
