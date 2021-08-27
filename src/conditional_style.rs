@@ -72,7 +72,7 @@ pub fn get_style<'a>(context: &Context, items: &[StarshipConditionalStyle<'a>]) 
 
 #[cfg(test)]
 mod tests {
-    use crate::conditional_style::StarshipConditionalStyle;
+    use super::*;
     use crate::context::{Context, Shell};
     use std::path::PathBuf;
 
@@ -97,6 +97,7 @@ mod tests {
 
         assert!(style.should_display(&context));
     }
+
     #[test]
     fn should_display_if_env_is_set_and_equals_is_none() {
         let style = StarshipConditionalStyle {
@@ -109,6 +110,7 @@ mod tests {
 
         assert!(style.should_display(&context));
     }
+
     #[test]
     fn should_not_display_if_not_equal() {
         let style = StarshipConditionalStyle {
@@ -120,5 +122,37 @@ mod tests {
         context.env.insert("env", "value".into());
 
         assert!(!style.should_display(&context));
+    }
+
+    #[test]
+    fn get_style_fallback() {
+        let context = create_context();
+        let items: Vec<StarshipConditionalStyle> = vec![];
+        assert_eq!(get_style(&context, &items), "");
+    }
+
+    #[test]
+    fn get_style_no_match() {
+        let context = create_context();
+        let items: Vec<StarshipConditionalStyle> = vec![
+            StarshipConditionalStyle::default(),
+            StarshipConditionalStyle::from("style"),
+        ];
+        assert_eq!(get_style(&context, &items), "style");
+    }
+
+    #[test]
+    fn get_style_match() {
+        let mut context = create_context();
+        context.env.insert("env", "value".into());
+        let items: Vec<StarshipConditionalStyle> = vec![
+            StarshipConditionalStyle {
+                env: Some("env"),
+                equals: Some("value"),
+                value: "red",
+            },
+            StarshipConditionalStyle::from("style"),
+        ];
+        assert_eq!(get_style(&context, &items), "red");
     }
 }
