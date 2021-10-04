@@ -533,6 +533,47 @@ mod tests {
     }
 
     #[test]
+    fn doesnt_show_if_only_status_is_hidden() -> io::Result<()> {
+        let repo_dir = fixture_repo(FixtureProvider::Git)?;
+
+        create_untracked(repo_dir.path())?;
+
+        let actual = ModuleRenderer::new("git_status")
+            .config(toml::toml! {
+                [git_status]
+                untracked = ""
+            })
+            .path(&repo_dir.path())
+            .collect();
+        let expected = None;
+
+        assert_eq!(expected, actual);
+        create_modified(repo_dir.path())?;
+        repo_dir.close()
+    }
+
+    #[test]
+    fn doesnt_show_hidden_status() -> io::Result<()> {
+        let repo_dir = fixture_repo(FixtureProvider::Git)?;
+
+        create_untracked(repo_dir.path())?;
+        create_modified(repo_dir.path())?;
+
+        let actual = ModuleRenderer::new("git_status")
+            .config(toml::toml! {
+                [git_status]
+                untracked = ""
+            })
+            .path(&repo_dir.path())
+            .collect();
+        let expected = format_output("!");
+
+        assert_eq!(expected, actual);
+        create_modified(repo_dir.path())?;
+        repo_dir.close()
+    }
+
+    #[test]
     fn shows_untracked_file_with_count() -> io::Result<()> {
         let repo_dir = fixture_repo(FixtureProvider::Git)?;
 
