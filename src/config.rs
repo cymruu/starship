@@ -67,11 +67,7 @@ impl<'a> ModuleConfig<'a> for &'a str {
 impl<'a> ModuleConfig<'a> for StarshipConditionalStyle<'a> {
     fn from_config(config: &'a Value) -> Option<Self> {
         match config {
-            Value::String(value) => Some(StarshipConditionalStyle {
-                env: None,
-                equals: None,
-                value,
-            }),
+            Value::String(value) => Some(StarshipConditionalStyle::from(value.as_str())),
             Value::Table(value) => Some(StarshipConditionalStyle::from(value)),
             _ => None,
         }
