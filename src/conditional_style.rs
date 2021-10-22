@@ -11,12 +11,12 @@ pub enum StarshipConditionalOperator {
 impl StarshipConditionalOperator {
     fn should_display(
         &self,
-        expression_left: Option<String>,
-        expression_right: Option<&str>,
+        parameter_left: Option<String>,
+        parameter_right: Option<&str>,
     ) -> bool {
         match self {
-            StarshipConditionalOperator::Equal => expression_left.as_deref() == expression_right,
-            StarshipConditionalOperator::Exists => expression_left.is_some(),
+            StarshipConditionalOperator::Equal => parameter_left.as_deref() == parameter_right,
+            StarshipConditionalOperator::Exists => parameter_left.is_some(),
         }
     }
 }
