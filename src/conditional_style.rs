@@ -130,10 +130,10 @@ mod tests {
     }
 
     #[test]
-    fn should_display_env_set_matching() {
+    fn conditional_style_should_apply_if_operator_matches() {
         let style = StarshipConditionalStyle {
             env: Some("env"),
-            operator: None,
+            operator: Some(StarshipConditionalOperator::Equal),
             equals: Some("value"),
             value: "",
         };
@@ -144,21 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn should_display_if_env_is_set_and_equals_is_none() {
-        let style = StarshipConditionalStyle {
-            env: Some("env"),
-            operator: None,
-            equals: None,
-            value: "",
-        };
-        let mut context = create_context();
-        context.env.insert("env", "value".into());
-
-        assert!(style.should_display(&context));
-    }
-
-    #[test]
-    fn should_not_display_if_not_equal() {
+    fn should_not_display_if_operator_doesnt_match() {
         let style = StarshipConditionalStyle {
             env: Some("env"),
             operator: Some(StarshipConditionalOperator::Equal),
@@ -191,21 +177,5 @@ mod tests {
             StarshipConditionalStyle::from("style"),
         ];
         assert_eq!(get_style(&context, &items), "style");
-    }
-
-    #[test]
-    fn get_style_match() {
-        let mut context = create_context();
-        context.env.insert("env", "value".into());
-        let items: Vec<StarshipConditionalStyle> = vec![
-            StarshipConditionalStyle {
-                env: Some("env"),
-                operator: None,
-                equals: Some("value"),
-                value: "red",
-            },
-            StarshipConditionalStyle::from("style"),
-        ];
-        assert_eq!(get_style(&context, &items), "red");
     }
 }
