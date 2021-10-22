@@ -1,9 +1,30 @@
 use crate::context::Context;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub enum StarshipConditionalOperator {
+    Equal,
+}
+
+impl TryFrom<&toml::value::Value> for StarshipConditionalOperator {
+    type Error = &'static str;
+
+    fn try_from(value: &toml::value::Value) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            Some(str_val) => match str_val {
+                "equal" => Ok(Self::Equal),
+                _ => Err("Invalid value for operator"),
+            },
+            None => Err("Operator value is not a string"),
+        }
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct StarshipConditionalStyle<'a> {
     pub env: Option<&'a str>,
+    pub operator: Option<StarshipConditionalOperator>,
     pub equals: Option<&'a str>,
     pub value: &'a str,
 }
@@ -27,6 +48,7 @@ impl<'a> Default for StarshipConditionalStyle<'a> {
     fn default() -> Self {
         StarshipConditionalStyle {
             env: None,
+            operator: None,
             equals: None,
             value: "",
         }
@@ -37,6 +59,7 @@ impl<'a> From<&'a str> for StarshipConditionalStyle<'a> {
     fn from(value: &'a str) -> Self {
         StarshipConditionalStyle {
             env: None,
+            operator: None,
             equals: None,
             value,
         }
@@ -46,9 +69,14 @@ impl<'a> From<&'a str> for StarshipConditionalStyle<'a> {
 impl<'a> From<&'a toml::value::Table> for StarshipConditionalStyle<'a> {
     fn from(value: &'a toml::value::Table) -> Self {
         let get_value = |key: &str| value.get(key)?.as_str();
+        let operator = match value.get("operator") {
+            Some(v) => StarshipConditionalOperator::try_from(v).ok(),
+            None => None,
+        };
 
         StarshipConditionalStyle {
             env: get_value("env"),
+            operator,
             equals: get_value("equals"),
             value: value
                 .get("value")
@@ -89,6 +117,7 @@ mod tests {
     fn should_display_env_set_matching() {
         let style = StarshipConditionalStyle {
             env: Some("env"),
+            operator: None,
             equals: Some("value"),
             value: "",
         };
@@ -102,6 +131,7 @@ mod tests {
     fn should_display_if_env_is_set_and_equals_is_none() {
         let style = StarshipConditionalStyle {
             env: Some("env"),
+            operator: None,
             equals: None,
             value: "",
         };
@@ -115,6 +145,7 @@ mod tests {
     fn should_not_display_if_not_equal() {
         let style = StarshipConditionalStyle {
             env: Some("env"),
+            operator: None,
             equals: Some("different"),
             value: "",
         };
@@ -148,6 +179,7 @@ mod tests {
         let items: Vec<StarshipConditionalStyle> = vec![
             StarshipConditionalStyle {
                 env: Some("env"),
+                operator: None,
                 equals: Some("value"),
                 value: "red",
             },

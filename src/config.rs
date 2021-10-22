@@ -494,6 +494,7 @@ fn parse_color_string(color_string: &str) -> Option<ansi_term::Color> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conditional_style::StarshipConditionalOperator;
     use starship_module_config_derive::ModuleConfig;
 
     #[test]
@@ -704,6 +705,7 @@ mod tests {
     fn test_from_conditional_style_from_table() {
         let config = toml::toml! {
             env = "HOSTNAME"
+            operator = "equal"
             equals = "home"
             value = "bold dimmed red"
         };
@@ -711,6 +713,7 @@ mod tests {
             <StarshipConditionalStyle>::from_config(&config).unwrap(),
             StarshipConditionalStyle {
                 env: Some("HOSTNAME"),
+                operator: Some(StarshipConditionalOperator::Equal),
                 equals: Some("home"),
                 value: "bold dimmed red"
             }
@@ -723,6 +726,7 @@ mod tests {
             <StarshipConditionalStyle>::from_config(&config2).unwrap(),
             StarshipConditionalStyle {
                 env: Some("HOSTNAME"),
+                operator: None,
                 equals: None,
                 value: "bold dimmed red"
             }
