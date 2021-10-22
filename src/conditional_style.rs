@@ -178,4 +178,21 @@ mod tests {
         ];
         assert_eq!(get_style(&context, &items), "style");
     }
+
+    #[test]
+    fn conditional_style_exists_operator() {
+        let items: Vec<StarshipConditionalStyle> = vec![
+            StarshipConditionalStyle {
+                env: Some("env"),
+                operator: Some(StarshipConditionalOperator::Exists),
+                equals: None,
+                value: "red",
+            },
+            StarshipConditionalStyle::from("style"),
+        ];
+        let mut context = create_context();
+        assert_eq!(get_style(&context, &items), "style");
+        context.env.insert("env", "value".into());
+        assert_eq!(get_style(&context, &items), "red");
+    }
 }
