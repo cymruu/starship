@@ -7,12 +7,24 @@ pub enum StarshipConditionalOperator {
     Equal,
 }
 
+impl StarshipConditionalOperator {
+    fn should_display(
+        &self,
+        expression_left: Option<String>,
+        expression_right: Option<&str>,
+    ) -> bool {
+        match self {
+            StarshipConditionalOperator::Equal => expression_left.as_deref() == expression_right,
+        }
+    }
+}
+
 impl TryFrom<&toml::value::Value> for StarshipConditionalOperator {
     type Error = &'static str;
 
     fn try_from(value: &toml::value::Value) -> Result<Self, Self::Error> {
         match value.as_str() {
-            Some(str_val) => match str_val {
+            Some(str_val) => match str_val.to_lowercase().as_str() {
                 "equal" => Ok(Self::Equal),
                 _ => Err("Invalid value for operator"),
             },
@@ -31,15 +43,15 @@ pub struct StarshipConditionalStyle<'a> {
 
 impl<'a> StarshipConditionalStyle<'a> {
     fn should_display(&self, context: &Context) -> bool {
-        match self.env {
-            Some(env_variable) => match self.equals {
-                Some(_) => {
-                    let env_variable_value = context.get_env(env_variable);
-                    env_variable_value.as_deref() == self.equals
-                }
-                None => true,
-            },
-            None => false,
+        let env_value = if let Some(env_variable_name) = self.env {
+            context.get_env(env_variable_name)
+        } else {
+            None
+        };
+
+        match &self.operator {
+            Some(operator) => operator.should_display(env_value, self.equals),
+            None => true, //display if element has no operator
         }
     }
 }
@@ -69,9 +81,10 @@ impl<'a> From<&'a str> for StarshipConditionalStyle<'a> {
 impl<'a> From<&'a toml::value::Table> for StarshipConditionalStyle<'a> {
     fn from(value: &'a toml::value::Table) -> Self {
         let get_value = |key: &str| value.get(key)?.as_str();
-        let operator = match value.get("operator") {
-            Some(v) => StarshipConditionalOperator::try_from(v).ok(),
-            None => None,
+        let operator = if let Some(value) = value.get("operator") {
+            StarshipConditionalOperator::try_from(value).ok()
+        } else {
+            None
         };
 
         StarshipConditionalStyle {
@@ -145,7 +158,7 @@ mod tests {
     fn should_not_display_if_not_equal() {
         let style = StarshipConditionalStyle {
             env: Some("env"),
-            operator: None,
+            operator: Some(StarshipConditionalOperator::Equal),
             equals: Some("different"),
             value: "",
         };
@@ -166,7 +179,12 @@ mod tests {
     fn get_style_no_match() {
         let context = create_context();
         let items: Vec<StarshipConditionalStyle> = vec![
-            StarshipConditionalStyle::default(),
+            StarshipConditionalStyle {
+                env: Some("env"),
+                operator: Some(StarshipConditionalOperator::Equal),
+                equals: Some("value"),
+                value: "red",
+            },
             StarshipConditionalStyle::from("style"),
         ];
         assert_eq!(get_style(&context, &items), "style");
