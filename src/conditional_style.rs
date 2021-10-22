@@ -5,6 +5,7 @@ use std::convert::TryFrom;
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum StarshipConditionalOperator {
     Equal,
+    Exists,
 }
 
 impl StarshipConditionalOperator {
@@ -15,6 +16,7 @@ impl StarshipConditionalOperator {
     ) -> bool {
         match self {
             StarshipConditionalOperator::Equal => expression_left.as_deref() == expression_right,
+            StarshipConditionalOperator::Exists => expression_left.is_some(),
         }
     }
 }
@@ -26,6 +28,7 @@ impl TryFrom<&toml::value::Value> for StarshipConditionalOperator {
         match value.as_str() {
             Some(str_val) => match str_val.to_lowercase().as_str() {
                 "equal" => Ok(Self::Equal),
+                "exists" => Ok(Self::Exists),
                 _ => Err("Invalid value for operator"),
             },
             None => Err("Operator value is not a string"),
