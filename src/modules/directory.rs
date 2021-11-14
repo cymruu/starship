@@ -55,26 +55,32 @@ impl<'a> StarshipPath<'a> {
         None
     }
     pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
-        let (start_index, prefix) = if config.truncate_to_repo {
-            (
-                self.components.iter().position(|x| x.is_repo),
-                String::default(),
-            )
+        let (start_index, prefix) = self.get_path_start_index_and_prefix(config);
+        let path_meta = self.components[start_index..]
+            .iter()
+            .map(|x| x.get_format_string(config))
+            .map(|x| format!("{}/", x));
+        let path = format!("{}/{}", prefix, String::from_iter(path_meta));
+
+        path.trim_start_matches('/')
+            .trim_end_matches('/')
+            .to_string()
+    }
+    fn get_path_start_index_and_prefix(&self, config: &DirectoryConfig) -> (usize, String) {
+        let repo_index = self.components.iter().position(|x| x.is_repo);
+        let (start_index, prefix) = if config.truncate_to_repo && repo_index.is_some() {
+            (repo_index, String::default())
         } else {
             (
                 self.components
                     .iter()
                     .position(|x| x.is_home)
                     .map(|x| x + 1),
-                String::from("~"),
+                String::from(config.home_symbol),
             )
         };
-        let start_index = start_index.unwrap_or(0);
-        let path_meta = self.components[start_index..]
-            .iter()
-            .map(|x| x.get_format_string(config))
-            .map(|x| format!("{}/", x));
-        format!("{}/{}", prefix, String::from_iter(path_meta))
+
+        (start_index.unwrap_or(0), prefix)
     }
 }
 
