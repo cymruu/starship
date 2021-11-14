@@ -71,10 +71,11 @@ impl<'a> StarshipPath<'a> {
             .for_each(|x| x.is_visible = false);
     }
     pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
+        let home_index = self.components.iter().position(|x| x.is_home).unwrap_or(0);
         let path_meta = self
             .components
             .iter()
-            .skip(0)
+            .skip(home_index) // start from home directory
             .map(|x| x.get_format_string(config));
         String::from_iter(path_meta)
     }
