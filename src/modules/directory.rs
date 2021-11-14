@@ -148,11 +148,9 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let mut starship_path = StarshipPath::from(display_dir);
     starship_path.find_home(&home_dir);
 
-    if config.truncate_to_repo {
-        if let Some(repo) = context.get_repo().ok() {
-            if let Some(repo_path) = repo.root.as_ref() {
-                starship_path.find_repo(repo_path);
-            };
+    if let Some(repo) = context.get_repo().ok() {
+        if let Some(repo_path) = repo.root.as_ref() {
+            starship_path.find_repo(repo_path);
         };
     };
 
