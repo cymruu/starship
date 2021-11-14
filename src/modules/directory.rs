@@ -22,12 +22,22 @@ struct StarshipPath<'a> {
     components: Vec<StarshipComponent<'a>>,
 }
 
-impl StarshipPath<'_> {
+impl<'a> StarshipPath<'a> {
     pub fn to_string_lossy(&self) -> std::borrow::Cow<'_, str> {
         self.path.to_string_lossy()
     }
-    pub fn find_repo(&mut self, repo_path: &Path) -> &Self {
-        let top_level_real_path = real_path(repo_path);
+    pub fn find_repo(&mut self, repo_path: &Path) {
+        if let Some(repo_component) = self.find_component(repo_path) {
+            repo_component.is_repo = true;
+        };
+    }
+    pub fn find_home(&mut self, home_path: &Path) {
+        if let Some(repo_component) = self.find_component(home_path) {
+            repo_component.is_home = true;
+        };
+    }
+    fn find_component(&mut self, component_path: &Path) -> Option<&mut StarshipComponent<'a>> {
+        let top_level_real_path = real_path(component_path);
         // Walk ancestors to preserve logical path in `full_path`.
         // If we'd just `full_real_path.strip_prefix(top_level_real_path)`,
         // then it wouldn't preserve logical path. It would've returned physical path.
@@ -38,11 +48,11 @@ impl StarshipPath<'_> {
             }
             let components: Vec<_> = self.path.components().collect();
 
-            let repo_index = components.len() - i - 1;
+            let component_index = components.len() - i - 1;
 
-            self.components[repo_index].is_repo = true;
+            return Some(&mut self.components[component_index]);
         }
-        self
+        None
     }
     pub fn truncate_to_repo(&mut self) {
         self.components
@@ -78,6 +88,7 @@ impl<'a> From<&'a PathBuf> for StarshipPath<'a> {
                 component: x,
                 is_repo: false,
                 is_visible: true,
+                is_home: false,
             })
             .collect();
         StarshipPath { path, components }
@@ -89,6 +100,7 @@ struct StarshipComponent<'a> {
     component: Component<'a>,
     is_repo: bool,
     is_visible: bool,
+    is_home: bool,
 }
 
 impl StarshipComponent<'_> {
@@ -141,6 +153,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     log::debug!("Display dir: {:?}", &display_dir);
 
     let mut starship_path = StarshipPath::from(display_dir);
+    starship_path.find_home(&home_dir);
 
     if config.truncate_to_repo {
         if let Some(repo) = context.get_repo().ok() {
