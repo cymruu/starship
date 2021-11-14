@@ -54,30 +54,27 @@ impl<'a> StarshipPath<'a> {
         }
         None
     }
-    pub fn truncate_to_repo(&mut self) {
-        self.components
-            .iter_mut()
-            .take_while(|x| !x.is_repo)
-            .for_each(|x| x.is_visible = false)
-    }
-    pub fn contract_path(&mut self, top_level_path: &Path) {
-        if !self.path.normalised_starts_with(top_level_path) {
-            return;
-        }
-        let mut to_hide = top_level_path.components();
-        self.components
-            .iter_mut()
-            .filter(|x| to_hide.any(|x2| x2 == x.component))
-            .for_each(|x| x.is_visible = false);
-    }
     pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
-        let home_index = self.components.iter().position(|x| x.is_home).unwrap_or(0);
-        let path_meta = self
-            .components
+        let (start_index, prefix) = if config.truncate_to_repo {
+            (
+                self.components.iter().position(|x| x.is_repo),
+                String::default(),
+            )
+        } else {
+            (
+                self.components
+                    .iter()
+                    .position(|x| x.is_home)
+                    .map(|x| x + 1),
+                String::from("~"),
+            )
+        };
+        let start_index = start_index.unwrap_or(0);
+        let path_meta = self.components[start_index..]
             .iter()
-            .skip(home_index) // start from home directory
-            .map(|x| x.get_format_string(config));
-        String::from_iter(path_meta)
+            .map(|x| x.get_format_string(config))
+            .map(|x| format!("{}/", x));
+        format!("{}/{}", prefix, String::from_iter(path_meta))
     }
 }
 
@@ -88,7 +85,6 @@ impl<'a> From<&'a PathBuf> for StarshipPath<'a> {
             .map(|x| StarshipComponent {
                 component: x,
                 is_repo: false,
-                is_visible: true,
                 is_home: false,
             })
             .collect();
@@ -100,22 +96,18 @@ impl<'a> From<&'a PathBuf> for StarshipPath<'a> {
 struct StarshipComponent<'a> {
     component: Component<'a>,
     is_repo: bool,
-    is_visible: bool,
     is_home: bool,
 }
 
 impl StarshipComponent<'_> {
     pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
-        match self.is_visible {
-            true => match self.is_repo {
-                true => format!(
-                    "[{}]({})",
-                    self.component.as_os_str().to_string_lossy(),
-                    config.repo_root_style,
-                ),
-                false => format!("{}", self.component.as_os_str().to_string_lossy()),
-            },
-            false => "".to_string(),
+        match self.is_repo {
+            true => format!(
+                "[{}]({})",
+                self.component.as_os_str().to_string_lossy(),
+                config.repo_root_style,
+            ),
+            false => format!("{}", self.component.as_os_str().to_string_lossy()),
         }
     }
 }
@@ -160,8 +152,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         if let Some(repo) = context.get_repo().ok() {
             if let Some(repo_path) = repo.root.as_ref() {
                 starship_path.find_repo(repo_path);
-                starship_path.truncate_to_repo();
-            }
+            };
         };
     };
 
