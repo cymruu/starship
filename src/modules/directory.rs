@@ -71,13 +71,13 @@ impl<'a> StarshipPath<'a> {
         let (start_index, prefix) = if config.truncate_to_repo && repo_index.is_some() {
             (repo_index, String::default())
         } else {
-            (
-                self.components
-                    .iter()
-                    .position(|x| x.is_home)
-                    .map(|x| x + 1),
-                String::from(config.home_symbol),
-            )
+            let home_index = self.components.iter().position(|x| x.is_home);
+            let prefix = if home_index.is_some() {
+                config.home_symbol
+            } else {
+                ""
+            };
+            (home_index.map(|x| x + 1), String::from(prefix))
         };
 
         (start_index.unwrap_or(0), prefix)
@@ -107,13 +107,10 @@ struct StarshipComponent<'a> {
 
 impl StarshipComponent<'_> {
     pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
+        let component_dir = self.component.as_os_str().to_string_lossy();
         match self.is_repo {
-            true => format!(
-                "[{}]({})",
-                self.component.as_os_str().to_string_lossy(),
-                config.repo_root_style,
-            ),
-            false => format!("{}", self.component.as_os_str().to_string_lossy()),
+            true => format!("[{}]({})", component_dir, config.repo_root_style,),
+            false => format!("{}", component_dir),
         }
     }
 }
