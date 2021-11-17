@@ -32,8 +32,8 @@ impl<'a> StarshipPath<'a> {
         };
     }
     pub fn find_home(&mut self, home_path: &Path) {
-        if let Some(repo_component) = self.find_component(home_path) {
-            repo_component.is_home = true;
+        if let Some(home_component) = self.find_component(home_path) {
+            home_component.is_home = true;
         };
     }
     fn find_component(&mut self, component_path: &Path) -> Option<&mut StarshipComponent<'a>> {
@@ -60,11 +60,13 @@ impl<'a> StarshipPath<'a> {
             .iter()
             .map(|x| x.get_format_string(config))
             .map(|x| format!("{}/", x));
-        let path = format!("{}/{}", prefix, String::from_iter(path_meta));
 
-        path.trim_start_matches('/')
-            .trim_end_matches('/')
-            .to_string()
+        let mut path = String::from_iter(path_meta);
+        if !prefix.is_empty() {
+            path = format!("{}/{}", prefix, path);
+        };
+
+        path.strip_suffix('/').unwrap_or(&path).to_string()
     }
     fn get_path_start_index_and_prefix(&self, config: &DirectoryConfig) -> (usize, String) {
         let repo_index = self.components.iter().position(|x| x.is_repo);
