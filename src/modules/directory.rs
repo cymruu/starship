@@ -58,20 +58,25 @@ impl<'a> StarshipPath<'a> {
         let (start_index, prefix) = self.get_path_start_index_and_prefix(config);
         let path_meta = self.components[start_index..]
             .iter()
-            .map(|x| x.get_format_string(config))
-            .map(|x| format!("{}/", x));
+            .map(|x| x.get_format_string(config));
 
         let mut path = String::from_iter(path_meta);
+        log::warn!("path1: {}", path);
         if !prefix.is_empty() {
-            path = format!("{}/{}", prefix, path);
+            path = format!("{}{}", prefix, path);
+        };
+        log::warn!("path with prefix: {}", path);
+
+        if (self.components.len() - start_index) > 1{
+            path = path.strip_suffix('/').unwrap_or(&path).to_string();
         };
 
-        path.strip_suffix('/').unwrap_or(&path).to_string()
+        path
     }
     fn get_path_start_index_and_prefix(&self, config: &DirectoryConfig) -> (usize, String) {
         let repo_index = self.components.iter().position(|x| x.is_repo);
         let (start_index, prefix) = if config.truncate_to_repo && repo_index.is_some() {
-            (repo_index, String::default())
+            (repo_index, "")
         } else {
             let home_index = self.components.iter().position(|x| x.is_home);
             let prefix = if home_index.is_some() {
@@ -79,10 +84,21 @@ impl<'a> StarshipPath<'a> {
             } else {
                 ""
             };
-            (home_index.map(|x| x + 1), String::from(prefix))
+            (home_index.map(|x| x + 1), prefix)
         };
+        let start_index = start_index.unwrap_or(0);
 
-        (start_index.unwrap_or(0), prefix)
+        let (start_index, prefix) = if config.truncation_length != 0
+            && (self.components.len() - start_index) > config.truncation_length as usize
+        {
+            (
+                self.components.len() - config.truncation_length as usize,
+                config.truncation_symbol,
+            )
+        } else {
+            (start_index, prefix)
+        };
+        (start_index, String::from(prefix))
     }
 }
 
@@ -110,10 +126,16 @@ struct StarshipComponent<'a> {
 impl StarshipComponent<'_> {
     pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
         let component_dir = self.component.as_os_str().to_string_lossy();
-        match self.is_repo {
+        let component_suffix = match self.component {
+            Component::RootDir => "",
+            _ => "/",
+        };
+        let component_format_string = match self.is_repo {
             true => format!("[{}]({})", component_dir, config.repo_root_style,),
             false => format!("{}", component_dir),
-        }
+        };
+
+        format!("{}{}", component_format_string, component_suffix)
     }
 }
 
