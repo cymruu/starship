@@ -56,9 +56,25 @@ impl<'a> StarshipPath<'a> {
     }
     pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
         let (start_index, prefix) = self.get_path_start_index_and_prefix(config);
+        let path_length = self.components.len() - start_index;
         let path_meta = self.components[start_index..]
             .iter()
-            .map(|x| x.get_format_string(config));
+            .enumerate()
+            .map(|(pos, x)| {
+                let component_string = x.get_format_string(config);
+                let component_suffix = match x.component {
+                    Component::RootDir => "",
+                    _ => {
+                        if pos + 1 == path_length {
+                            ""
+                        } else {
+                            "/"
+                        }
+                    }
+                };
+
+                format!("{}{}", component_string, component_suffix)
+            });
 
         let mut path = String::from_iter(path_meta);
         log::warn!("path1: {}", path);
@@ -66,10 +82,6 @@ impl<'a> StarshipPath<'a> {
             path = format!("{}{}", prefix, path);
         };
         log::warn!("path with prefix: {}", path);
-
-        if (self.components.len() - start_index) > 1{
-            path = path.strip_suffix('/').unwrap_or(&path).to_string();
-        };
 
         path
     }
@@ -125,17 +137,12 @@ struct StarshipComponent<'a> {
 
 impl StarshipComponent<'_> {
     pub fn get_format_string(&self, config: &DirectoryConfig) -> String {
-        let component_dir = self.component.as_os_str().to_string_lossy();
-        let component_suffix = match self.component {
-            Component::RootDir => "",
-            _ => "/",
-        };
-        let component_format_string = match self.is_repo {
-            true => format!("[{}]({})", component_dir, config.repo_root_style,),
-            false => format!("{}", component_dir),
-        };
+        let component_path_string = self.component.as_os_str().to_string_lossy();
 
-        format!("{}{}", component_format_string, component_suffix)
+        match self.is_repo {
+            true => format!("[{}]({})", component_path_string, config.repo_root_style,),
+            false => format!("{}", component_path_string),
+        }
     }
 }
 
@@ -634,7 +641,7 @@ mod tests {
         let actual = ModuleRenderer::new("directory")
             .path(home_dir().unwrap())
             .collect();
-        let expected = Some(format!("{} ", Color::Cyan.bold().paint("~")));
+        let expected = Some(format!("{} ", Color::Cyan.bold().paint("~/")));
 
         assert_eq!(expected, actual);
     }
@@ -659,7 +666,7 @@ mod tests {
             .path(home_dir().unwrap().join("path/subpath"))
             .config(toml::toml! {
                 [directory]
-                home_symbol = "🚀"
+                home_symbol = "🚀/"
             })
             .collect();
         let expected = Some(format!("{} ", Color::Cyan.bold().paint("🚀/path/subpath")));
