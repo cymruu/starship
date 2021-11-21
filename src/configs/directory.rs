@@ -31,7 +31,7 @@ impl<'a> Default for DirectoryConfig<'a> {
             substitutions: IndexMap::new(),
             format: "[$path]($style)[$read_only]($read_only_style) ",
             style: "cyan bold",
-            repo_root_style: "red",
+            repo_root_style: "",
             disabled: false,
             read_only: "🔒",
             read_only_style: "red",
