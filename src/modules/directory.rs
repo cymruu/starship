@@ -100,8 +100,18 @@ impl<'a> StarshipPath<'a> {
         };
         let start_index = start_index.unwrap_or(0);
 
+        let first_component_root_offset = self
+            .components
+            .get(start_index)
+            .map(|x| match x.component {
+                Component::RootDir => 1,
+                _ => 0,
+            })
+            .unwrap_or(0);
+
         let (start_index, prefix) = if config.truncation_length != 0
-            && (self.components.len() - start_index) > config.truncation_length as usize
+            && (self.components.len() - start_index) - first_component_root_offset
+                > config.truncation_length as usize
         {
             (
                 self.components.len() - config.truncation_length as usize,
@@ -1381,10 +1391,7 @@ mod tests {
             })
             .path(dir)
             .collect();
-        let expected = Some(format!(
-            "{} ",
-            Color::Cyan.bold().paint("…/a/b/subpath")
-        ));
+        let expected = Some(format!("{} ", Color::Cyan.bold().paint("…/a/b/subpath")));
         assert_eq!(expected, actual);
         tmp_dir.close()
     }
