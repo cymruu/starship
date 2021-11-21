@@ -208,10 +208,6 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
 
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
-            .map_meta(|var, _| match var {
-                "path" => Some(&path_meta),
-                _ => None,
-            })
             .map_style(|variable| match variable {
                 "style" => Some(Ok(config.style)),
                 "repo_root_style" => Some(Ok(config.repo_root_style)),
@@ -226,6 +222,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
                         None
                     }
                 }
+                "path" => Some(Ok(&path_meta)),
                 _ => None,
             })
             .parse(None, Some(context))
@@ -368,8 +365,8 @@ fn real_path<P: AsRef<Path>>(path: P) -> PathBuf {
 /// substitutions, in order, on the path. Any non-pair of strings is ignored.
 fn substitute_path(dir_string: String, substitutions: &IndexMap<String, &str>) -> String {
     let mut substituted_dir = dir_string;
-    for substitution_pair in substitutions {
-        substituted_dir = substituted_dir.replace(substitution_pair.0, substitution_pair.1);
+    for (from, to) in substitutions {
+        substituted_dir = substituted_dir.replace(from, to);
     }
     substituted_dir
 }
@@ -681,7 +678,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn substituted_truncated_path() {
         let actual = ModuleRenderer::new("directory")
             .path("/some/long/network/path/workspace/a/b/c/dev")
@@ -702,7 +698,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn substitution_order() {
         let actual = ModuleRenderer::new("directory")
             .path("/path/to/sub")
@@ -718,7 +713,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn strange_substitution() {
         let strange_sub = "/\\/;,!";
         let actual = ModuleRenderer::new("directory")
