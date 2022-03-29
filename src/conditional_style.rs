@@ -50,6 +50,17 @@ pub struct StarshipConditionalStyle<'a> {
     pub style: &'a str,
 }
 
+impl<'a> From<&'a str> for StarshipConditionalStyle<'a> {
+    fn from(value: &'a str) -> Self {
+        StarshipConditionalStyle {
+            env: None,
+            operator: None,
+            expected_value: None,
+            style: value,
+        }
+    }
+}
+
 impl<'a> StarshipConditionalStyle<'a> {
     fn should_apply(&self, context: &Context) -> bool {
         let env_value = self.env.and_then(|x| context.get_env(x));
@@ -59,6 +70,16 @@ impl<'a> StarshipConditionalStyle<'a> {
             None => true,
         }
     }
+}
+
+pub fn get_conditional_style<'a>(
+    context: &Context,
+    items: &[StarshipConditionalStyle<'a>],
+) -> &'a str {
+    let matching_style = items.iter().find(|s| s.should_apply(context));
+    let last = items.iter().last();
+
+    matching_style.or(last).map(|x| x.style).unwrap_or("")
 }
 
 #[cfg(test)]
@@ -131,5 +152,43 @@ mod tests {
                 style: "bold dimmed red"
             })
         );
+    }
+
+    #[test]
+    fn get_conditional_style_fallback() {
+        let context = create_context();
+        let items: Vec<StarshipConditionalStyle> = vec![];
+        assert_eq!(get_conditional_style(&context, &items), "");
+    }
+
+    #[test]
+    fn get_conditional_style_no_match() {
+        let context = create_context();
+        let items: Vec<StarshipConditionalStyle> = vec![
+            StarshipConditionalStyle {
+                env: Some("env"),
+                operator: Some(StarshipConditionalStyleOperator::Equal),
+                expected_value: Some("value"),
+                style: "red",
+            },
+            StarshipConditionalStyle::from("red bold"),
+        ];
+        assert_eq!(get_conditional_style(&context, &items), "red bold");
+    }
+
+    #[test]
+    fn get_conditional_style_match_operator() {
+        let items: Vec<StarshipConditionalStyle> = vec![
+            StarshipConditionalStyle {
+                env: Some("env"),
+                operator: Some(StarshipConditionalStyleOperator::Exists),
+                expected_value: None,
+                style: "red",
+            },
+            StarshipConditionalStyle::from("style"),
+        ];
+        let mut context = create_context();
+        context.env.insert("env", "value".into());
+        assert_eq!(get_conditional_style(&context, &items), "red");
     }
 }
