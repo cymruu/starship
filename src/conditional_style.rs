@@ -1,10 +1,36 @@
 use crate::context::Context;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StarshipConditionalStyleOperator {
     Equal,
     Exists,
+}
+
+impl Serialize for StarshipConditionalStyleOperator {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(match *self {
+            StarshipConditionalStyleOperator::Equal => "equal",
+            StarshipConditionalStyleOperator::Exists => "exists",
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for StarshipConditionalStyleOperator {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.to_lowercase().as_str() {
+            "equal" => StarshipConditionalStyleOperator::Equal,
+            "exists" => StarshipConditionalStyleOperator::Exists,
+            _ => StarshipConditionalStyleOperator::Equal,
+        })
+    }
 }
 
 impl StarshipConditionalStyleOperator {
@@ -16,7 +42,7 @@ impl StarshipConditionalStyleOperator {
     }
 }
 
-#[derive(Clone, Serialize, Debug, PartialEq, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct StarshipConditionalStyle<'a> {
     pub env: Option<&'a str>,
     pub operator: Option<StarshipConditionalStyleOperator>,
@@ -39,6 +65,7 @@ impl<'a> StarshipConditionalStyle<'a> {
 mod tests {
     use super::*;
     use crate::context::{Context, Shell, Target};
+    use crate::serde_utils::ValueDeserializer;
     use std::path::PathBuf;
 
     fn create_context<'a>() -> Context<'a> {
@@ -60,6 +87,7 @@ mod tests {
             expected_value: None,
             style: "",
         };
+        
         assert_eq!(style.should_apply(&context), false);
         context.env.insert("test", String::default());
         assert_eq!(style.should_apply(&context), true);
@@ -74,10 +102,34 @@ mod tests {
             expected_value: Some("expected"),
             style: "",
         };
+
         assert_eq!(style.should_apply(&context), false);
         context.env.insert("test", String::from("not_expected"));
         assert_eq!(style.should_apply(&context), false);
         context.env.insert("test", String::from("expected"));
         assert_eq!(style.should_apply(&context), true);
+    }
+
+    #[test]
+    fn should_deserialize_from_table_value() {
+        let config = toml::toml! {
+            env = "HOSTNAME"
+            operator = "equal"
+            expected_value = "home"
+            style = "bold dimmed red"
+        };
+        let deserializer = ValueDeserializer::new(&config);
+
+        let result = StarshipConditionalStyle::deserialize(deserializer);
+
+        assert_eq!(
+            result,
+            Ok(StarshipConditionalStyle {
+                env: Some("HOSTNAME"),
+                operator: Some(StarshipConditionalStyleOperator::Equal),
+                expected_value: Some("home"),
+                style: "bold dimmed red"
+            })
+        );
     }
 }
