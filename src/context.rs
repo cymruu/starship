@@ -47,7 +47,7 @@ pub struct Context<'a> {
 
     /// Private field to store Git information for modules who need it
     repo: OnceCell<Repo>,
-    repos: IndexMap<&'a str, OnceCell<Repo>>,
+    repos: IndexMap<&'a str, DiscoverableRepo>,
 
     /// The shell the user is assumed to be running
     pub shell: Shell,
@@ -78,6 +78,31 @@ pub struct Context<'a> {
 
     /// Avoid issues with unused lifetimes when features are disabled
     _marker: PhantomData<&'a ()>,
+}
+
+fn discover_git_repo(context: &Context) -> Result<Repo, git2::Error> {
+    let repository = if env::var("GIT_DIR").is_ok() {
+        Repository::open_from_env()
+    } else {
+        Repository::discover(&context.current_dir)
+    }?;
+    Ok(Repo {
+        branch: get_current_branch(&repository),
+        workdir: repository.workdir().map(Path::to_path_buf),
+        path: Path::to_path_buf(repository.path()),
+        state: repository.state(),
+        remote: get_remote_repository_info(&repository),
+    })
+}
+
+fn discover_mercurial_repo(context: &Context) -> Result<Repo, git2::Error> {
+    Ok(Repo {
+        branch: Some("hg_branch".to_owned()),
+        workdir: Some(PathBuf::from("/")),
+        path: PathBuf::from("/"),
+        state: RepositoryState::Clean,
+        remote: None,
+    })
 }
 
 impl<'a> Context<'a> {
@@ -159,8 +184,14 @@ impl<'a> Context<'a> {
             dir_contents: OnceCell::new(),
             repo: OnceCell::new(),
             repos: indexmap! {
-                "git"=>OnceCell::new(),
-                "hg"=>OnceCell::new(),
+                "git" => DiscoverableRepo {
+                    discover: discover_git_repo,
+                    repo: OnceCell::new(),
+                },
+                "hg" => DiscoverableRepo {
+                    discover: discover_mercurial_repo,
+                    repo: OnceCell::new(),
+                },
             },
             shell,
             target,
@@ -260,53 +291,24 @@ impl<'a> Context<'a> {
         })
     }
 
-
-    pub fn get_repo(&self) -> Result<&Repo, git2::Error> {
-        self.repo.get_or_try_init(|| -> Result<Repo, git2::Error> {
-            let repository = if env::var("GIT_DIR").is_ok() {
-                Repository::open_from_env()
-            } else {
-                Repository::discover(&self.current_dir)
-            }?;
-            Ok(Repo {
-                branch: get_current_branch(&repository),
-                workdir: repository.workdir().map(Path::to_path_buf),
-                path: Path::to_path_buf(repository.path()),
-                state: repository.state(),
-                remote: get_remote_repository_info(&repository),
-            })
-        })
-    }
+    // pub fn get_repo(&self) -> Result<&Repo, git2::Error> {
+    //     self.repos.iter().filter(|(key, value)| value)
+    // }
 
     /// Will lazily get first found repository when a module requests it.
     pub fn get_git_repo(&self) -> Result<&Repo, git2::Error> {
-        self.repo.get_or_try_init(|| -> Result<Repo, git2::Error> {
-            let repository = if env::var("GIT_DIR").is_ok() {
-                Repository::open_from_env()
-            } else {
-                Repository::discover(&self.current_dir)
-            }?;
-            Ok(Repo {
-                branch: get_current_branch(&repository),
-                workdir: repository.workdir().map(Path::to_path_buf),
-                path: Path::to_path_buf(repository.path()),
-                state: repository.state(),
-                remote: get_remote_repository_info(&repository),
-            })
-        })
+        let discoverable_git_repo = &self.repos["git"];
+        discoverable_git_repo
+            .repo
+            .get_or_try_init(|| (discoverable_git_repo.discover)(self))
     }
 
     /// Will lazily get mercurial root and branch when a module requests it.
-    pub fn get_hg_repo(&self)->Result<&Repo, ()> {
-        self.repos["hg"].get_or_try_init(|| -> Result<Repo, ()> {
-            Ok(Repo {
-                branch: Some("hg_branch".to_owned()),
-                workdir: Some(PathBuf::from("/")),
-                path: PathBuf::from("/"),
-                state: RepositoryState::Clean,
-                remote: None,
-            })
-        })
+    pub fn get_hg_repo(&self) -> Result<&Repo, git2::Error> {
+        let discoverable_git_repo = &self.repos["hg"];
+        discoverable_git_repo
+            .repo
+            .get_or_try_init(|| (discoverable_git_repo.discover)(self))
     }
 
     pub fn dir_contents(&self) -> Result<&DirContents, std::io::Error> {
@@ -379,6 +381,11 @@ impl<'a> Context<'a> {
             .iter()
             .find_map(|attempt| self.exec_cmd(attempt[0], &attempt[1..]))
     }
+}
+
+struct DiscoverableRepo {
+    discover: fn(&Context) -> Result<Repo, git2::Error>,
+    repo: OnceCell<Repo>,
 }
 
 #[derive(Debug)]
