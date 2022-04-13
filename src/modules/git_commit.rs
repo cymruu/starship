@@ -12,7 +12,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let mut module = context.new_module("git_commit");
     let config: GitCommitConfig = GitCommitConfig::try_load(module.config);
 
-    let repo = context.get_repo().ok()?;
+    let repo = context.get_git_repo().ok()?;
     let git_repo = repo.open().ok()?;
 
     let is_detached = git_repo.head_detached().ok()?;

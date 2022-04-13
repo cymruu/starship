@@ -20,7 +20,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         return None;
     };
 
-    let repo = context.get_repo().ok()?;
+    let repo = context.get_git_repo().ok()?;
     let repo_root = repo.workdir.as_ref()?;
 
     let diff = context

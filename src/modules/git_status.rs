@@ -33,7 +33,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let info = Arc::new(GitStatusInfo::load(context, config.clone()));
 
     //Return None if not in git repository
-    context.get_repo().ok()?;
+    context.get_git_repo().ok()?;
     if let Some(git_status) = git_status_wsl(context, &config) {
         if git_status.is_empty() {
             return None;

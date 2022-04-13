@@ -7,6 +7,7 @@ use crate::modules;
 use crate::utils::{self, home_dir};
 use clap::Parser;
 use git2::{ErrorCode::UnbornBranch, Repository, RepositoryState};
+use indexmap::{indexmap, IndexMap};
 use once_cell::sync::OnceCell;
 #[cfg(test)]
 use std::collections::HashMap;
@@ -46,6 +47,7 @@ pub struct Context<'a> {
 
     /// Private field to store Git information for modules who need it
     repo: OnceCell<Repo>,
+    repos: IndexMap<&'a str, OnceCell<Repo>>,
 
     /// The shell the user is assumed to be running
     pub shell: Shell,
@@ -156,6 +158,10 @@ impl<'a> Context<'a> {
             logical_dir,
             dir_contents: OnceCell::new(),
             repo: OnceCell::new(),
+            repos: indexmap! {
+                "git"=>OnceCell::new(),
+                "hg"=>OnceCell::new(),
+            },
             shell,
             target,
             width,
@@ -254,7 +260,7 @@ impl<'a> Context<'a> {
         })
     }
 
-    /// Will lazily get repo root and branch when a module requests it.
+
     pub fn get_repo(&self) -> Result<&Repo, git2::Error> {
         self.repo.get_or_try_init(|| -> Result<Repo, git2::Error> {
             let repository = if env::var("GIT_DIR").is_ok() {
@@ -268,6 +274,37 @@ impl<'a> Context<'a> {
                 path: Path::to_path_buf(repository.path()),
                 state: repository.state(),
                 remote: get_remote_repository_info(&repository),
+            })
+        })
+    }
+
+    /// Will lazily get first found repository when a module requests it.
+    pub fn get_git_repo(&self) -> Result<&Repo, git2::Error> {
+        self.repo.get_or_try_init(|| -> Result<Repo, git2::Error> {
+            let repository = if env::var("GIT_DIR").is_ok() {
+                Repository::open_from_env()
+            } else {
+                Repository::discover(&self.current_dir)
+            }?;
+            Ok(Repo {
+                branch: get_current_branch(&repository),
+                workdir: repository.workdir().map(Path::to_path_buf),
+                path: Path::to_path_buf(repository.path()),
+                state: repository.state(),
+                remote: get_remote_repository_info(&repository),
+            })
+        })
+    }
+
+    /// Will lazily get mercurial root and branch when a module requests it.
+    pub fn get_hg_repo(&self)->Result<&Repo, ()> {
+        self.repos["hg"].get_or_try_init(|| -> Result<Repo, ()> {
+            Ok(Repo {
+                branch: Some("hg_branch".to_owned()),
+                workdir: Some(PathBuf::from("/")),
+                path: PathBuf::from("/"),
+                state: RepositoryState::Clean,
+                remote: None,
             })
         })
     }
