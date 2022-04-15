@@ -291,24 +291,21 @@ impl<'a> Context<'a> {
         })
     }
 
-    // pub fn get_repo(&self) -> Result<&Repo, git2::Error> {
-    //     self.repos.iter().filter(|(key, value)| value)
-    // }
+    pub fn get_repo(&self) -> Option<&Repo> {
+        self.repos
+            .values()
+            .find(|discoverable_repo| discoverable_repo.get(self).is_ok())
+            .map(|discoverable_repo| discoverable_repo.get(self).unwrap())
+    }
 
     /// Will lazily get first found repository when a module requests it.
     pub fn get_git_repo(&self) -> Result<&Repo, git2::Error> {
-        let discoverable_git_repo = &self.repos["git"];
-        discoverable_git_repo
-            .repo
-            .get_or_try_init(|| (discoverable_git_repo.discover)(self))
+        self.repos["git"].get(self)
     }
 
     /// Will lazily get mercurial root and branch when a module requests it.
     pub fn get_hg_repo(&self) -> Result<&Repo, git2::Error> {
-        let discoverable_git_repo = &self.repos["hg"];
-        discoverable_git_repo
-            .repo
-            .get_or_try_init(|| (discoverable_git_repo.discover)(self))
+        self.repos["hg"].get(self)
     }
 
     pub fn dir_contents(&self) -> Result<&DirContents, std::io::Error> {
@@ -386,6 +383,12 @@ impl<'a> Context<'a> {
 struct DiscoverableRepo {
     discover: fn(&Context) -> Result<Repo, git2::Error>,
     repo: OnceCell<Repo>,
+}
+
+impl DiscoverableRepo {
+    fn get(&self, context: &Context) -> Result<&Repo, git2::Error> {
+        self.repo.get_or_try_init(|| (self.discover)(context))
+    }
 }
 
 #[derive(Debug)]
