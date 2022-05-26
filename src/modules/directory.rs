@@ -51,8 +51,6 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     log::warn!("Physical dir: {:?}", &physical_dir);
     log::warn!("Display dir: {:?}", &display_dir);
 
-    let starship_path = StarshipPath::new(display_dir, &home_dir);
-    log::warn!("Starship path: {:?}", starship_path);
 
     // Attempt repository path contraction (if we are in a git repository)
     // Otherwise use the logical path, automatically contracting
@@ -60,7 +58,11 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         context.get_repo().ok()
     } else {
         None
-    };
+    };    let repo_dir = repo.and_then(|x| x.workdir.as_ref());
+
+    let starship_path = StarshipPath::new(display_dir, &home_dir, repo_dir);
+    log::warn!("Starship path: {:?}", starship_path);
+
     let dir_string = if config.truncate_to_repo {
         repo.and_then(|r| r.workdir.as_ref())
             .filter(|&root| root != &home_dir)
