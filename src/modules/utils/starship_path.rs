@@ -1,3 +1,4 @@
+use crate::configs::directory::DirectoryConfig;
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
@@ -25,6 +26,15 @@ impl<'a> StarshipPath<'a> {
                 .collect::<Vec<_>>(),
         }
     }
+    pub fn display(self, config: &DirectoryConfig) -> String {
+        String::from_iter(
+            self.components
+                .iter()
+                .rev()
+                .map(|x| x.get())
+                .map(|x| format!("{}/", x)),
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -32,6 +42,12 @@ struct StarshipComponent<'a> {
     component: Option<Component<'a>>,
     is_repo: bool,
     is_home: bool,
+}
+
+impl StarshipComponent<'_> {
+    pub fn get(&self) -> String {
+        String::from(self.component.unwrap().as_os_str().to_string_lossy())
+    }
 }
 
 fn real_path<P: AsRef<Path>>(path: P) -> PathBuf {
