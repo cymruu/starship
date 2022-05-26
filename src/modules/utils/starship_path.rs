@@ -1,4 +1,5 @@
 use crate::configs::directory::DirectoryConfig;
+use std::cmp::Reverse;
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
@@ -15,10 +16,10 @@ impl<'a> StarshipPath<'a> {
             path: path.to_owned(),
             components: path
                 .ancestors()
-                .map(|component| {
-                    let component_real_path = real_path(component);
+                .map(|ancestor| {
+                    let component_real_path = real_path(ancestor);
                     StarshipComponent {
-                        component: component.components().last(),
+                        component: ancestor.components().last(),
                         is_home: component_real_path == home_real_path,
                         is_repo: Some(component_real_path) == repo_real_path,
                     }
@@ -26,14 +27,32 @@ impl<'a> StarshipPath<'a> {
                 .collect::<Vec<_>>(),
         }
     }
-    pub fn display(self, config: &DirectoryConfig) -> String {
-        String::from_iter(
-            self.components
-                .iter()
+    fn truncate(&self, config: &'a DirectoryConfig) -> (usize, &'a str) {
+        let mut sort_options: Vec<(usize, &'a str)> = vec![(0, "")];
+
+        if let Some(i) = self.components.iter().position(|x| x.is_home) {
+            sort_options.push((i, config.home_symbol));
+        };
+        if config.truncate_to_repo {
+            if let Some(i) = self.components.iter().position(|x| x.is_repo) {
+                sort_options.push((i, ""));
+            };
+        };
+        log::warn!("before sorting {:?}", sort_options);
+        sort_options.sort_by_key(|k| Reverse(k.0));
+        log::warn!("sorted {:?}", sort_options);
+        sort_options[0]
+    }
+    pub fn display(&self, _config: &'a DirectoryConfig) -> String {
+        let (start, prefix) = self.truncate(_config);
+        let path_components = self.components[..start].iter();
+        let path = String::from_iter(
+            path_components
                 .rev()
                 .map(|x| x.get())
                 .map(|x| format!("{}/", x)),
-        )
+        );
+        format!("{}{}", prefix, path).trim_end_matches('/').to_string()
     }
 }
 
