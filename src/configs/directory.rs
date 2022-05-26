@@ -39,7 +39,7 @@ impl<'a> Default for DirectoryConfig<'a> {
             read_only: "🔒",
             read_only_style: "red",
             truncation_symbol: "",
-            home_symbol: "~",
+            home_symbol: "~/",
             use_os_path_sep: true,
         }
     }
