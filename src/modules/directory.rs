@@ -13,38 +13,10 @@ use unicode_segmentation::UnicodeSegmentation;
 use super::{Context, Module};
 
 use super::utils::directory::truncate;
+use super::utils::starship_path::StarshipPath;
 use crate::config::ModuleConfig;
 use crate::configs::directory::DirectoryConfig;
 use crate::formatter::StringFormatter;
-
-#[derive(Debug)]
-struct StarshipPath<'a> {
-    path: PathBuf,
-    components: Vec<StarshipComponent<'a>>,
-}
-
-impl<'a> From<&'a PathBuf> for StarshipPath<'a> {
-    fn from(path: &'a PathBuf) -> StarshipPath<'a> {
-        StarshipPath {
-            path: path.to_owned(),
-            components: path
-                .components()
-                .map(|x| StarshipComponent {
-                    component: x,
-                    is_home: false,
-                    is_repo: false,
-                })
-                .collect::<Vec<_>>(),
-        }
-    }
-}
-
-#[derive(Debug)]
-struct StarshipComponent<'a> {
-    component: Component<'a>,
-    is_repo: bool,
-    is_home: bool,
-}
 
 /// Creates a module with the current logical or physical directory
 ///
@@ -79,7 +51,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     log::warn!("Physical dir: {:?}", &physical_dir);
     log::warn!("Display dir: {:?}", &display_dir);
 
-    let starship_path = StarshipPath::from(display_dir);
+    let starship_path = StarshipPath::new(display_dir, &home_dir);
     log::warn!("Starship path: {:?}", starship_path);
 
     // Attempt repository path contraction (if we are in a git repository)
