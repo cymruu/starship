@@ -7,3 +7,4 @@ pub mod directory_win;
 pub mod directory_nix;
 
 pub mod path;
+pub mod starship_path;
