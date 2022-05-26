@@ -140,6 +140,8 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     };
     let repo_root_style = config.repo_root_style.unwrap_or(config.style);
 
+    let path = starship_path.display(&config);
+
     let parsed = StringFormatter::new(display_format).and_then(|formatter| {
         formatter
             .map_style(|variable| match variable {
@@ -149,7 +151,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
                 _ => None,
             })
             .map(|variable| match variable {
-                "path" => Some(Ok(&path_vec[2])),
+                "path" => Some(Ok(&path)),
                 "before_root_path" => Some(Ok(&path_vec[0])),
                 "repo_root" => Some(Ok(&path_vec[1])),
                 "read_only" => {
