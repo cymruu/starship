@@ -12,60 +12,67 @@ impl<'a> StarshipPath<'a> {
     pub fn new(path: &'a PathBuf, home_dir: &PathBuf, repo_dir: Option<&PathBuf>) -> Self {
         let home_real_path = real_path(home_dir);
         let repo_real_path = repo_dir.map(|path| real_path(path));
+        let mut components = path
+            .ancestors()
+            .map(|ancestor| {
+                let component_real_path = real_path(ancestor);
+                StarshipComponent {
+                    component: ancestor.components().last().unwrap(),
+                    is_home: component_real_path == home_real_path,
+                    is_repo: Some(component_real_path) == repo_real_path,
+                }
+            })
+            .collect::<Vec<_>>();
+        components.reverse();
         Self {
             path: path.to_owned(),
-            components: path
-                .ancestors()
-                .map(|ancestor| {
-                    let component_real_path = real_path(ancestor);
-                    StarshipComponent {
-                        component: ancestor.components().last(),
-                        is_home: component_real_path == home_real_path,
-                        is_repo: Some(component_real_path) == repo_real_path,
-                    }
-                })
-                .collect::<Vec<_>>(),
+            components: components,
         }
     }
     fn truncate(&self, config: &'a DirectoryConfig) -> (usize, &'a str) {
-        let mut sort_options: Vec<(usize, &'a str)> = vec![(0, "")];
+        let mut truncation: (usize, &'a str) = (0, "");
 
         if let Some(i) = self.components.iter().position(|x| x.is_home) {
-            sort_options.push((i, config.home_symbol));
+            truncation = (i+1, config.home_symbol)
         };
-        if config.truncate_to_repo {
-            if let Some(i) = self.components.iter().position(|x| x.is_repo) {
-                sort_options.push((i, ""));
-            };
-        };
-        log::warn!("before sorting {:?}", sort_options);
-        sort_options.sort_by_key(|k| Reverse(k.0));
-        log::warn!("sorted {:?}", sort_options);
-        sort_options[0]
+
+        // if config.truncate_to_repo {
+        //     if let Some(i) = self.components.iter().position(|x| x.is_repo) {
+        //         if truncation.0 > i {
+        //             truncation = (i, "")
+        //         }
+        //     };
+        // };
+        truncation
     }
     pub fn display(&self, _config: &'a DirectoryConfig) -> String {
-        let (start, prefix) = self.truncate(_config);
-        let path_components = self.components[..start].iter();
+        let (trim_index, prefix) = self.truncate(_config);
+        log::warn!("truncate: {:?} {:?}", trim_index, prefix);
+        let path_components = self.components[trim_index..].iter();
         let path = String::from_iter(
             path_components
-                .rev()
                 .map(|x| x.get())
-                .map(|x| format!("{}/", x)),
+                // .map(|x| {
+                //     log::warn!("componnent: {:?}", x);
+                //     x
+                // })
+                .map(|x| format!("{}/", x))
         );
-        format!("{}{}", prefix, path).trim_end_matches('/').to_string()
+        let path = format!("{}{}", prefix, path);
+        String::from(path)
     }
 }
 
 #[derive(Debug)]
 struct StarshipComponent<'a> {
-    component: Option<Component<'a>>,
+    component: Component<'a>,
     is_repo: bool,
     is_home: bool,
 }
 
 impl StarshipComponent<'_> {
     pub fn get(&self) -> String {
-        String::from(self.component.unwrap().as_os_str().to_string_lossy())
+        String::from(self.component.as_os_str().to_string_lossy())
     }
 }
 
