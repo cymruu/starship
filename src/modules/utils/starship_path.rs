@@ -29,11 +29,11 @@ impl<'a> StarshipPath<'a> {
             components: components,
         }
     }
-    fn truncate(&self, config: &'a DirectoryConfig) -> (usize, &'a str) {
-        let mut truncation: (usize, &'a str) = (0, "");
+    fn truncate(&self, config: &'a DirectoryConfig) -> (usize, String) {
+        let mut truncation: (usize, String) = (0, String::default());
 
         if let Some(i) = self.components.iter().position(|x| x.is_home) {
-            truncation = (i+1, config.home_symbol)
+            truncation = (i + 1, format!("{}/", config.home_symbol))
         };
 
         // if config.truncate_to_repo {
@@ -56,10 +56,10 @@ impl<'a> StarshipPath<'a> {
                 //     log::warn!("componnent: {:?}", x);
                 //     x
                 // })
-                .map(|x| format!("{}/", x))
+                .map(|x| format!("{}/", x)),
         );
         let path = format!("{}{}", prefix, path);
-        String::from(path)
+        path.strip_suffix('/').unwrap_or(&path).to_string()
     }
 }
 
