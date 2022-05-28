@@ -31,9 +31,19 @@ impl<'a> StarshipPath<'a> {
     }
     fn truncate(&self, config: &'a DirectoryConfig) -> (usize, String) {
         let mut truncation: (usize, String) = (0, String::default());
+        let path_length = self.components.len();
 
+        // truncate to home
         if let Some(i) = self.components.iter().position(|x| x.is_home) {
             truncation = (i + 1, format!("{}/", config.home_symbol))
+        };
+
+        // truncate length
+        if path_length - truncation.0 > config.truncation_length as usize {
+            truncation = (
+                (path_length - config.truncation_length as usize),
+                String::from(config.truncation_symbol),
+            )
         };
 
         // if config.truncate_to_repo {
