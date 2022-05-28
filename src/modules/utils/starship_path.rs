@@ -1,5 +1,4 @@
 use crate::configs::directory::DirectoryConfig;
-use std::cmp::Reverse;
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
@@ -12,18 +11,20 @@ impl<'a> StarshipPath<'a> {
     pub fn new(path: &'a PathBuf, home_dir: &PathBuf, repo_dir: Option<&PathBuf>) -> Self {
         let home_real_path = real_path(home_dir);
         let repo_real_path = repo_dir.map(|path| real_path(path));
-        let mut components = path
-            .ancestors()
-            .map(|ancestor| {
-                let component_real_path = real_path(ancestor);
+        let components = path
+            .components()
+            .enumerate()
+            .map(|(idx, component)| {
+                let component_real_path =
+                    real_path(PathBuf::from_iter(path.components().take(idx + 1)));
+                log::warn!("component real path {:?}", component_real_path);
                 StarshipComponent {
-                    component: ancestor.components().last().unwrap(),
+                    component: component,
                     is_home: component_real_path == home_real_path,
                     is_repo: Some(component_real_path) == repo_real_path,
                 }
             })
             .collect::<Vec<_>>();
-        components.reverse();
         Self {
             path: path.to_owned(),
             components: components,
