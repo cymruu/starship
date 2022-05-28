@@ -56,21 +56,22 @@ impl<'a> StarshipPath<'a> {
         // };
         truncation
     }
-    pub fn display(&self, _config: &'a DirectoryConfig) -> String {
-        let (trim_index, prefix) = self.truncate(_config);
+    pub fn display(&self, config: &'a DirectoryConfig) -> String {
+        let (trim_index, prefix) = self.truncate(config);
         log::warn!("truncate: {:?} {:?}", trim_index, prefix);
-        let path_components = self.components[trim_index..].iter();
-        let path = String::from_iter(
-            path_components
-                .map(|x| x.get())
-                // .map(|x| {
-                //     log::warn!("componnent: {:?}", x);
-                //     x
-                // })
-                .map(|x| format!("{}/", x)),
-        );
-        let path = format!("{}{}", prefix, path);
-        path.strip_suffix('/').unwrap_or(&path).to_string()
+        let path_components = self.components[trim_index..].iter().enumerate();
+        let path_last_index = path_components.len();
+        let path = String::from_iter(path_components.map(|(idx, x)| match x.component {
+            Component::RootDir => x.get(),
+            _ => {
+                let is_last = idx == path_last_index - 1;
+                match is_last {
+                    true => x.get(),
+                    false => format!("{}/", x.get()),
+                }
+            }
+        }));
+        format!("{}{}", prefix, path)
     }
 }
 
