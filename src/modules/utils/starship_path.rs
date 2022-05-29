@@ -40,7 +40,7 @@ impl<'a> StarshipPath<'a> {
         };
 
         // truncate length
-        if path_length - truncation.0 > config.truncation_length as usize {
+        if path_length - truncation.0 >= config.truncation_length as usize {
             truncation = (
                 (path_length - config.truncation_length as usize),
                 String::from(config.truncation_symbol),
