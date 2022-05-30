@@ -36,7 +36,7 @@ impl<'a> StarshipPath<'a> {
 
         // truncate to home
         if let Some(i) = self.components.iter().position(|x| x.is_home) {
-            truncation = (i + 1, format!("{}/", config.home_symbol))
+            truncation = (i + 1, String::from(config.home_symbol))
         };
 
         // truncate length
