@@ -39,7 +39,7 @@ impl<'a> StarshipPath<'a> {
             truncation = (i + 1, String::from(config.home_symbol))
         };
 
-        // truncate length
+        // truncate to length
         if path_length - truncation.0 >= config.truncation_length as usize {
             truncation = (
                 (path_length - config.truncation_length as usize),
@@ -71,6 +71,11 @@ impl<'a> StarshipPath<'a> {
                 }
             }
         }));
+        let prefix = if prefix.len() > 0 && path_last_index > 0 {
+            format!("{}/", prefix)
+        } else {
+            prefix
+        };
         format!("{}{}", prefix, path)
     }
 }
