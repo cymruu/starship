@@ -36,24 +36,28 @@ impl<'a> StarshipPath<'a> {
 
         // truncate to home
         if let Some(i) = self.components.iter().position(|x| x.is_home) {
+            log::warn!("TRUNCATE HOME");
             truncation = (i + 1, String::from(config.home_symbol))
         };
 
         // truncate to length
         if path_length - truncation.0 >= config.truncation_length as usize {
+            log::warn!("TRUNCATE LENGTH");
             truncation = (
                 (path_length - config.truncation_length as usize),
                 String::from(config.truncation_symbol),
             )
         };
 
-        // if config.truncate_to_repo {
-        //     if let Some(i) = self.components.iter().position(|x| x.is_repo) {
-        //         if truncation.0 > i {
-        //             truncation = (i, "")
-        //         }
-        //     };
-        // };
+        if config.truncate_to_repo {
+            if let Some(i) = self.components.iter().position(|x| x.is_repo) {
+                log::warn!("TRUNCATE REPO");
+                if i > truncation.0 {
+                    truncation = (i, String::from(config.truncation_symbol))
+                }
+            };
+        };
+
         truncation
     }
     pub fn display(&self, config: &'a DirectoryConfig) -> String {
@@ -62,12 +66,12 @@ impl<'a> StarshipPath<'a> {
         let path_components = self.components[trim_index..].iter().enumerate();
         let path_last_index = path_components.len();
         let path = String::from_iter(path_components.map(|(idx, x)| match x.component {
-            Component::RootDir => x.get(),
+            Component::RootDir => x.get(config),
             _ => {
                 let is_last = idx == path_last_index - 1;
                 match is_last {
-                    true => x.get(),
-                    false => format!("{}/", x.get()),
+                    true => x.get(config),
+                    false => format!("{}/", x.get(config)),
                 }
             }
         }));
@@ -88,8 +92,14 @@ struct StarshipComponent<'a> {
 }
 
 impl StarshipComponent<'_> {
-    pub fn get(&self) -> String {
-        String::from(self.component.as_os_str().to_string_lossy())
+    pub fn get(&self, config: &DirectoryConfig) -> String {
+        let component_path_string = self.component.as_os_str().to_string_lossy();
+        let repo_style = config.repo_root_style.unwrap_or("");
+        log::warn!("repo_style: {}", repo_style);
+        match self.is_repo && repo_style.len() > 0 {
+            true => format!("[{}]({})", component_path_string, repo_style),
+            false => format!("{}", component_path_string),
+        }
     }
 }
 

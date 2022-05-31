@@ -50,7 +50,6 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     log::warn!("Physical dir: {:?}", &physical_dir);
     log::warn!("Display dir: {:?}", &display_dir);
 
-
     // Attempt repository path contraction (if we are in a git repository)
     // Otherwise use the logical path, automatically contracting
     let repo = context.get_repo().ok();
@@ -59,101 +58,22 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let starship_path = StarshipPath::new(display_dir, &home_dir, repo_dir);
     log::warn!("Starship path: {:?}", starship_path);
 
-    let dir_string = if config.truncate_to_repo {
-        repo.and_then(|r| r.workdir.as_ref())
-            .filter(|&root| root != &home_dir)
-            .and_then(|root| contract_repo_path(display_dir, root))
-    } else {
-        None
-    };
-
-    let mut is_truncated = dir_string.is_some();
-
-    // the home directory if required.
-    let dir_string =
-        dir_string.unwrap_or_else(|| contract_path(display_dir, &home_dir, &home_symbol));
-
-    #[cfg(windows)]
-    let dir_string = remove_extended_path_prefix(dir_string);
-
-    // Apply path substitutions
-    let dir_string = substitute_path(dir_string, &config.substitutions);
-
-    // Truncate the dir string to the maximum number of path components
-    let dir_string =
-        if let Some(truncated) = truncate(&dir_string, config.truncation_length as usize) {
-            is_truncated = true;
-            truncated
-        } else {
-            dir_string
-        };
-
-    let prefix = if is_truncated {
-        // Substitutions could have changed the prefix, so don't allow them and
-        // fish-style path contraction together
-        if config.fish_style_pwd_dir_length > 0 && config.substitutions.is_empty() {
-            // If user is using fish style path, we need to add the segment first
-            let contracted_home_dir = contract_path(display_dir, &home_dir, &home_symbol);
-            to_fish_style(
-                config.fish_style_pwd_dir_length as usize,
-                contracted_home_dir,
-                &dir_string,
-            )
-        } else {
-            String::from(config.truncation_symbol)
-        }
-    } else {
-        String::from("")
-    };
-
-    let path_vec = match &repo.and_then(|r| r.workdir.as_ref()) {
-        Some(repo_root) if config.repo_root_style.is_some() => {
-            let contracted_path = contract_repo_path(display_dir, repo_root)?;
-            let repo_path_vec: Vec<&str> = contracted_path.split('/').collect();
-            let after_repo_root = contracted_path.replacen(repo_path_vec[0], "", 1);
-            let num_segments_after_root = after_repo_root.split('/').count();
-
-            if config.truncation_length == 0
-                || ((num_segments_after_root - 1) as i64) < config.truncation_length
-            {
-                let root = repo_path_vec[0];
-                let before = dir_string.replace(&contracted_path, "");
-                [prefix + &before, root.to_string(), after_repo_root]
-            } else {
-                ["".to_string(), "".to_string(), prefix + &dir_string]
-            }
-        }
-        _ => ["".to_string(), "".to_string(), prefix + &dir_string],
-    };
-
-    let path_vec = if config.use_os_path_sep {
-        path_vec.map(|i| convert_path_sep(&i))
-    } else {
-        path_vec
-    };
-
     let lock_symbol = String::from(config.read_only);
-    let display_format = if path_vec[0].is_empty() && path_vec[1].is_empty() {
-        config.format
-    } else {
-        config.repo_root_format
-    };
-    let repo_root_style = config.repo_root_style.unwrap_or(config.style);
 
     let path = starship_path.display(&config);
 
-    let parsed = StringFormatter::new(display_format).and_then(|formatter| {
+    let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
             .map_style(|variable| match variable {
                 "style" => Some(Ok(config.style)),
                 "read_only_style" => Some(Ok(config.read_only_style)),
-                "repo_root_style" => Some(Ok(repo_root_style)),
+                _ => None,
+            })
+            .map_meta(|var, _| match var {
+                "path" => Some(&path),
                 _ => None,
             })
             .map(|variable| match variable {
-                "path" => Some(Ok(&path)),
-                "before_root_path" => Some(Ok(&path_vec[0])),
-                "repo_root" => Some(Ok(&path_vec[1])),
                 "read_only" => {
                     if is_readonly_dir(physical_dir) {
                         Some(Ok(&lock_symbol))
@@ -1323,7 +1243,7 @@ mod tests {
             .config(toml::toml! {
                 [directory]
                 truncation_length = 3
-                truncation_symbol = "…/"
+                truncation_symbol = "…"
             })
             .path(Path::new("/a/four/element/path"))
             .collect();
@@ -1342,7 +1262,7 @@ mod tests {
             .config(toml::toml! {
                 [directory]
                 truncation_length = 4
-                truncation_symbol = "…/"
+                truncation_symbol = "…"
             })
             .path(Path::new("/a/four/element/path"))
             .collect();
@@ -1365,7 +1285,7 @@ mod tests {
             .config(toml::toml! {
                 [directory]
                 truncation_length = 3
-                truncation_symbol = "…/"
+                truncation_symbol = "…"
             })
             .path(dir)
             .collect();
@@ -1416,7 +1336,7 @@ mod tests {
             .config(toml::toml! {
                 [directory]
                 truncation_length = 3
-                truncation_symbol = "…/"
+                truncation_symbol = "…"
             })
             .path(dir)
             .collect();
@@ -1440,7 +1360,7 @@ mod tests {
             .config(toml::toml! {
                 [directory]
                 truncation_length = 5
-                truncation_symbol = "…/"
+                truncation_symbol = "…"
                 truncate_to_repo = true
             })
             .path(dir)
@@ -1627,7 +1547,7 @@ mod tests {
     }
 
     #[test]
-    fn highlight_git_root_dir() -> io::Result<()> {
+    fn highlight_git_root_dir_aa() -> io::Result<()> {
         let (tmp_dir, _) = make_known_tempdir(Path::new("/tmp"))?;
         let repo_dir = tmp_dir.path().join("above").join("repo");
         let dir = repo_dir.join("src/sub/path");
