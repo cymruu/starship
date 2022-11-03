@@ -69,10 +69,14 @@ impl<'a> StarshipPath<'a> {
         log::warn!("truncate: {:?} {:?}", trim_index, prefix);
         let path_components = self.components[trim_index..].iter();
         let path_last_index = path_components.len();
-        let path = path_components
+        let mut path = path_components
             .map(|x| x.get(config))
             .collect::<Vec<_>>()
             .join("/");
+
+        if path.starts_with("//") {
+            path = path[1..].to_string()
+        }
 
         let prefix = if prefix.len() > 0 && path_last_index > 0 {
             format!("{}/", prefix)
