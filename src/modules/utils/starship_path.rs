@@ -1,4 +1,4 @@
-use crate::configs::directory::DirectoryConfig;
+use crate::configs::{c, directory::DirectoryConfig};
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
@@ -45,7 +45,8 @@ impl<'a> StarshipPath<'a> {
             && path_length - truncation.0 >= config.truncation_length as usize
         {
             let truncation_index = path_length - config.truncation_length as usize;
-            if truncation_index == 1 { // truncated to directory next to root - disable truncation 
+            if truncation_index == 1 {
+                // truncated to directory next to root - disable truncation
                 truncation = (0, String::default())
             } else {
                 truncation = (truncation_index, String::from(config.truncation_symbol))
@@ -66,18 +67,13 @@ impl<'a> StarshipPath<'a> {
     pub fn display(&self, config: &'a DirectoryConfig) -> String {
         let (trim_index, prefix) = self.truncate(config);
         log::warn!("truncate: {:?} {:?}", trim_index, prefix);
-        let path_components = self.components[trim_index..].iter().enumerate();
+        let path_components = self.components[trim_index..].iter();
         let path_last_index = path_components.len();
-        let path = String::from_iter(path_components.map(|(idx, x)| match x.component {
-            Component::RootDir => x.get(config),
-            _ => {
-                let is_last = idx == path_last_index - 1;
-                match is_last {
-                    true => x.get(config),
-                    false => format!("{}/", x.get(config)),
-                }
-            }
-        }));
+        let path = path_components
+            .map(|x| x.get(config))
+            .collect::<Vec<_>>()
+            .join("/");
+
         let prefix = if prefix.len() > 0 && path_last_index > 0 {
             format!("{}/", prefix)
         } else {
