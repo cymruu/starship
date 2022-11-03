@@ -1598,9 +1598,8 @@ mod tests {
             .path(dir)
             .collect();
         let expected = Some(format!(
-            "{}{}repo{} ",
-            Color::Cyan.bold().prefix(),
-            Color::Red.prefix(),
+            "{}repo{} ",
+            Color::Red.bold().prefix(),
             Color::Cyan.paint(convert_path_sep("/src/sub/path"))
         ));
         assert_eq!(expected, actual);
@@ -1619,7 +1618,7 @@ mod tests {
             .config(toml::toml! {
                 [directory]
                 truncation_length = 5
-                truncation_symbol = "…/"
+                truncation_symbol = "…"
                 truncate_to_repo = false
                 repo_root_style = "green"
             })

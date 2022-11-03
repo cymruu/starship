@@ -41,12 +41,15 @@ impl<'a> StarshipPath<'a> {
         };
 
         // truncate to length
-        if path_length - truncation.0 >= config.truncation_length as usize {
-            log::warn!("TRUNCATE LENGTH");
-            truncation = (
-                (path_length - config.truncation_length as usize),
-                String::from(config.truncation_symbol),
-            )
+        if config.truncation_length != 0
+            && path_length - truncation.0 >= config.truncation_length as usize
+        {
+            let truncation_index = path_length - config.truncation_length as usize;
+            if truncation_index == 1 { // truncated to directory next to root - disable truncation 
+                truncation = (0, String::default())
+            } else {
+                truncation = (truncation_index, String::from(config.truncation_symbol))
+            }
         };
 
         if config.truncate_to_repo {
