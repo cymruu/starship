@@ -96,13 +96,7 @@ struct StarshipComponent<'a> {
 
 impl StarshipComponent<'_> {
     pub fn get(&self, config: &DirectoryConfig) -> String {
-        let component_path_string = self.component.as_os_str().to_string_lossy();
-        let repo_style = config.repo_root_style.unwrap_or("");
-        log::warn!("repo_style: {}", repo_style);
-        match self.is_repo && repo_style.len() > 0 {
-            true => format!("[{}]({})", component_path_string, repo_style),
-            false => format!("{}", component_path_string),
-        }
+        self.component.as_os_str().to_string_lossy()
     }
 }
 

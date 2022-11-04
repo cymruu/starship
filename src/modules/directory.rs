@@ -57,7 +57,8 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         context.get_repo().ok()
     } else {
         None
-    };    let repo_dir = repo.and_then(|x| x.workdir.as_ref());
+    };
+    let repo_dir = repo.and_then(|x| x.workdir.as_ref());
 
     let starship_path = StarshipPath::new(display_dir, &home_dir, repo_dir);
     log::warn!("Starship path: {:?}", starship_path);
@@ -65,19 +66,25 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let lock_symbol = String::from(config.read_only);
 
     let path = starship_path.display(&config);
+    log::warn!("PATH: {:?}", path);
+
+    let path = substitute_path(path, &config.substitutions);
+    log::warn!("SUBSTITUTED PATH: {:?}", path);
+
+    let repo_root_style = config.repo_root_style.unwrap_or(config.style);
 
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
             .map_style(|variable| match variable {
                 "style" => Some(Ok(config.style)),
                 "read_only_style" => Some(Ok(config.read_only_style)),
-                _ => None,
-            })
-            .map_meta(|var, _| match var {
-                "path" => Some(&path),
+                "repo_root_style" => Some(Ok(repo_root_style)),
                 _ => None,
             })
             .map(|variable| match variable {
+                "path" => Some(Ok(&path)),
+                "before_root_path" => Some(Ok(&path)),
+                "repo_root" => Some(Ok(&path)),
                 "read_only" => {
                     if is_readonly_dir(physical_dir) {
                         Some(Ok(&lock_symbol))
